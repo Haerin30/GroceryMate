@@ -2,22 +2,46 @@ import 'package:flutter/material.dart';
 
 import '../../domain/grocery_list.dart';
 
-/// One grocery list in the overview. Tapping is delegated to the parent so the
-/// card stays reusable when real navigation is added.
+enum _CardAction { edit, active, completed, archived, delete }
+
+/// One grocery list in the overview. Editing, status changes, and deletion are
+/// delegated to the parent so the card stays reusable.
 class GroceryListCard extends StatelessWidget {
   const GroceryListCard({
     super.key,
     required this.groceryList,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onStatusChanged,
   });
 
   final GroceryList groceryList;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final ValueChanged<GroceryListStatus> onStatusChanged;
+
+  void _handleAction(_CardAction action) {
+    switch (action) {
+      case _CardAction.edit:
+        onEdit();
+      case _CardAction.active:
+        onStatusChanged(GroceryListStatus.active);
+      case _CardAction.completed:
+        onStatusChanged(GroceryListStatus.completed);
+      case _CardAction.archived:
+        onStatusChanged(GroceryListStatus.archived);
+      case _CardAction.delete:
+        onDelete();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colors = theme.colorScheme;
+    final String categoryLabel = groceryList.category?.name ?? 'No category';
 
     return Card(
       child: ListTile(
@@ -27,24 +51,90 @@ class GroceryListCard extends StatelessWidget {
           foregroundColor: colors.onPrimaryContainer,
           child: const Icon(Icons.shopping_basket_outlined),
         ),
-        title: Text(
-          groceryList.title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        title: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                groceryList.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _StatusBadge(status: groceryList.status),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('$categoryLabel  •  ${groceryList.itemCount} items'),
+              const SizedBox(height: 2),
+              Text(
+                groceryList.budget == null
+                    ? 'Budget: Not set'
+                    : 'Budget: ${_formatMoney(groceryList.budget!)}',
+                style: TextStyle(
+                  color: groceryList.budget == null
+                      ? colors.onSurfaceVariant
+                      : colors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Estimated total: ${_formatMoney(groceryList.estimatedTotal)}',
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Updated ${MaterialLocalizations.of(context).formatCompactDate(groceryList.updatedAt)}',
+              ),
+            ],
           ),
         ),
-        subtitle: Text('${groceryList.category}  •  ${groceryList.itemCount} items'),
-        trailing: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            _StatusBadge(status: groceryList.status),
-            const SizedBox(height: 6),
-            Text(
-              '\$${groceryList.estimatedTotal.toStringAsFixed(2)}',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: colors.primary,
-                fontWeight: FontWeight.w700,
+        trailing: PopupMenuButton<_CardAction>(
+          tooltip: 'List options',
+          onSelected: _handleAction,
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<_CardAction>>[
+            const PopupMenuItem<_CardAction>(
+              value: _CardAction.edit,
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.edit_outlined),
+                  SizedBox(width: 12),
+                  Text('Edit'),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
+            PopupMenuItem<_CardAction>(
+              value: _CardAction.active,
+              enabled: groceryList.status != GroceryListStatus.active,
+              child: const Text('Mark as active'),
+            ),
+            PopupMenuItem<_CardAction>(
+              value: _CardAction.completed,
+              enabled: groceryList.status != GroceryListStatus.completed,
+              child: const Text('Mark as completed'),
+            ),
+            PopupMenuItem<_CardAction>(
+              value: _CardAction.archived,
+              enabled: groceryList.status != GroceryListStatus.archived,
+              child: const Text('Mark as archived'),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem<_CardAction>(
+              value: _CardAction.delete,
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.delete_outline),
+                  SizedBox(width: 12),
+                  Text('Delete'),
+                ],
               ),
             ),
           ],
@@ -53,6 +143,8 @@ class GroceryListCard extends StatelessWidget {
     );
   }
 }
+
+String _formatMoney(double amount) => '₱${amount.toStringAsFixed(2)}';
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.status});
@@ -64,17 +156,17 @@ class _StatusBadge extends StatelessWidget {
     final ColorScheme colors = Theme.of(context).colorScheme;
     final (Color background, Color foreground) = switch (status) {
       GroceryListStatus.active => (
-          colors.primaryContainer,
-          colors.onPrimaryContainer
-        ),
+        colors.primaryContainer,
+        colors.onPrimaryContainer,
+      ),
       GroceryListStatus.completed => (
-          colors.secondaryContainer,
-          colors.onSecondaryContainer
-        ),
+        colors.secondaryContainer,
+        colors.onSecondaryContainer,
+      ),
       GroceryListStatus.archived => (
-          colors.surfaceContainerHighest,
-          colors.onSurfaceVariant
-        ),
+        colors.surfaceContainerHighest,
+        colors.onSurfaceVariant,
+      ),
     };
 
     return Container(

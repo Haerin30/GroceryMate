@@ -5,8 +5,9 @@ people organise grocery lists, add products by search/barcode/manual entry,
 track estimated costs and budgets, compare store prices, and review spending
 history. No account or internet connection is needed for core features.
 
-> Milestone 1 delivers the application shell and a basic **Grocery Lists**
-> screen. Feature flows and local persistence are planned for later milestones.
+> Milestone 2 adds **Grocery List Management**: create, edit, delete, status
+> changes, categories, filtering, and sorting with in-memory state. Local
+> persistence and grocery items are planned for later milestones.
 
 ## Project details
 
@@ -33,9 +34,10 @@ lib/
 │   └── errors/
 ├── features/
 │   └── grocery_lists/
-│       ├── data/                # temporary preview data
-│       ├── domain/              # GroceryList model and status
-│       └── presentation/        # screen and reusable card
+│       ├── data/                # starter lists for the in-memory store
+│       ├── domain/              # models, categories, filter/sort rules
+│       ├── state/               # in-memory controller (CRUD + categories)
+│       └── presentation/        # screen, card, and create/edit form
 │   ├── products/                # future feature folders
 │   ├── scanner/
 │   ├── calculator/
@@ -48,9 +50,10 @@ lib/
     └── models/
 ```
 
-The structure is feature-first so each area can grow its own data, domain, and
-presentation layers. Riverpod and Drift can be introduced in their reserved
-folders without restructuring screens.
+The structure is feature-first so each area can grow its own data, domain, state,
+and presentation layers. The grocery list controller is a plain `ChangeNotifier`
+(no extra packages); a repository-backed implementation can replace it when
+Drift persistence is introduced.
 
 ## Running the app
 
