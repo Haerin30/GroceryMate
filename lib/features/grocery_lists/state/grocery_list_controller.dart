@@ -1,37 +1,60 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../core/utils/id_generator.dart';
+import '../data/grocery_list_repository.dart';
 import '../data/sample_grocery_lists.dart';
 import '../domain/grocery_category.dart';
 import '../domain/grocery_list.dart';
+import '../domain/grocery_list_input.dart';
 
-/// In-memory state and business logic for Grocery List Management.
+/// ChangeNotifier used by the screens.
 ///
-/// Widgets talk to this controller instead of mutating lists themselves. It is
-/// deliberately persistence-free; a repository-backed notifier can replace it
-/// later without changing the feature's widgets.
+/// When a [repository] is supplied, stream subscriptions keep the visible data
+/// in sync with SQLite and every mutation is delegated to the repository.
+/// Without one, the controller keeps the same data in memory, which keeps the
+/// focused widget tests lightweight and deterministic.
 class GroceryListController extends ChangeNotifier {
   GroceryListController({
+    GroceryListRepository? repository,
     List<GroceryList>? initialLists,
     List<GroceryCategory>? customCategories,
     DateTime Function()? now,
-  }) : _lists = List<GroceryList>.of(initialLists ?? sampleGroceryLists),
+  }) : _repository = repository,
+       _lists = List<GroceryList>.of(
+         initialLists ??
+             (repository == null ? sampleGroceryLists : const <GroceryList>[]),
+       ),
        _customCategories = List<GroceryCategory>.of(
          customCategories ?? const <GroceryCategory>[],
        ),
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _categories = List<GroceryCategory>.of(GroceryCategory.predefined) {
+    if (repository != null) {
+      _listenTo(repository);
+    }
+  }
 
+  final GroceryListRepository? _repository;
+  final DateTime Function() _now;
   final List<GroceryList> _lists;
   final List<GroceryCategory> _customCategories;
-  final DateTime Function() _now;
-  int _nextId = 1;
+  List<GroceryCategory> _categories;
+  StreamSubscription<List<GroceryList>>? _listsSubscription;
+  StreamSubscription<List<GroceryCategory>>? _categoriesSubscription;
+  bool _disposed = false;
 
   List<GroceryList> get lists => List<GroceryList>.unmodifiable(_lists);
+
   List<GroceryCategory> get customCategories =>
       List<GroceryCategory>.unmodifiable(_customCategories);
-  List<GroceryCategory> get availableCategories => <GroceryCategory>[
-    ...GroceryCategory.predefined,
-    ..._customCategories,
-  ];
+
+  List<GroceryCategory> get availableCategories => List<GroceryCategory>.of(
+    _repository == null
+        ? <GroceryCategory>[...GroceryCategory.predefined, ..._customCategories]
+        : _categories,
+  );
 
   /// Finds a predefined or custom category by name, ignoring case and
   /// surrounding whitespace. Used to prevent duplicate categories.
@@ -48,72 +71,97 @@ class GroceryListController extends ChangeNotifier {
 
   /// Adds a custom category, or returns the existing match when the name is a
   /// duplicate (case- and whitespace-insensitive).
-  GroceryCategory addCustomCategory(String name) {
+  Future<GroceryCategory> addCustomCategory(String name) async {
     final String cleanName =
         GroceryCategory.cleanName(name) ??
         (throw ArgumentError.value(name, 'name', 'Category name is required'));
+
+    if (_repository != null) {
+      return _repository.addCustomCategory(cleanName);
+    }
+
     final GroceryCategory? existing = findCategory(cleanName);
     if (existing != null) return existing;
 
-    final GroceryCategory category = GroceryCategory(
-      id: _newCategoryId(),
-      name: cleanName,
-    );
+    final GroceryCategory category = _makeCustomCategory(cleanName);
     _customCategories.add(category);
-    notifyListeners();
+    _notify();
     return category;
   }
 
   /// Creates a new active list and returns it.
-  GroceryList addList({
+  Future<GroceryList> addList({
     required String title,
     GroceryCategory? category,
     double? budget,
     String? newCategoryName,
-  }) {
+  }) async {
+    if (_repository != null) {
+      return _repository.createList(
+        title: title,
+        category: category,
+        budget: budget,
+        newCategoryName: newCategoryName,
+      );
+    }
+
     final GroceryList list = GroceryList(
-      id: _newListId(),
-      title: _cleanTitle(title),
-      category: _resolveCategory(category, newCategoryName),
+      id: IdGenerator.uuidV4(),
+      title: GroceryListInput.cleanTitle(title),
+      category: _resolveLocalCategory(category, newCategoryName),
       status: GroceryListStatus.active,
-      budget: _cleanBudget(budget),
+      budget: GroceryListInput.cleanBudget(budget),
       updatedAt: _now(),
     );
     _lists.add(list);
-    notifyListeners();
+    _notify();
     return list;
   }
 
   /// Edits name/category/budget while keeping the id, status, and item data.
   /// Returns `null` when the id is unknown.
-  GroceryList? updateList(
+  Future<GroceryList?> updateList(
     String id, {
     required String title,
     GroceryCategory? category,
     required double? budget,
     String? newCategoryName,
-  }) {
+  }) async {
+    if (_repository != null) {
+      return _repository.updateList(
+        id,
+        title: title,
+        category: category,
+        budget: budget,
+        newCategoryName: newCategoryName,
+      );
+    }
+
     final int index = _indexOf(id);
     if (index == -1) return null;
 
     final GroceryList previous = _lists[index];
     final GroceryList updated = GroceryList(
       id: previous.id,
-      title: _cleanTitle(title),
-      category: _resolveCategory(category, newCategoryName),
+      title: GroceryListInput.cleanTitle(title),
+      category: _resolveLocalCategory(category, newCategoryName),
       status: previous.status,
       itemCount: previous.itemCount,
       estimatedTotal: previous.estimatedTotal,
-      budget: _cleanBudget(budget),
+      budget: GroceryListInput.cleanBudget(budget),
       updatedAt: _now(),
     );
     _lists[index] = updated;
-    notifyListeners();
+    _notify();
     return updated;
   }
 
   /// Changes a list's status and refreshes its last-modified timestamp.
-  GroceryList? setStatus(String id, GroceryListStatus status) {
+  Future<GroceryList?> setStatus(String id, GroceryListStatus status) async {
+    if (_repository != null) {
+      return _repository.setStatus(id, status);
+    }
+
     final int index = _indexOf(id);
     if (index == -1) return null;
 
@@ -131,63 +179,66 @@ class GroceryListController extends ChangeNotifier {
       updatedAt: _now(),
     );
     _lists[index] = updated;
-    notifyListeners();
+    _notify();
     return updated;
   }
 
   /// Removes a list. Returns `false` when the id is unknown.
-  bool deleteList(String id) {
+  Future<bool> deleteList(String id) async {
+    if (_repository != null) {
+      return _repository.deleteList(id);
+    }
+
     final int before = _lists.length;
     _lists.removeWhere((GroceryList list) => list.id == id);
     final bool removed = _lists.length < before;
-    if (removed) notifyListeners();
+    if (removed) _notify();
     return removed;
+  }
+
+  void _listenTo(GroceryListRepository repository) {
+    _listsSubscription = repository.watchLists().listen((
+      List<GroceryList> lists,
+    ) {
+      _lists
+        ..clear()
+        ..addAll(lists);
+      _notify();
+    });
+    _categoriesSubscription = repository.watchCategories().listen((
+      List<GroceryCategory> categories,
+    ) {
+      _categories = List<GroceryCategory>.of(categories);
+      _customCategories
+        ..clear()
+        ..addAll(
+          categories.where(
+            (GroceryCategory category) => !category.isPredefined,
+          ),
+        );
+      _notify();
+    });
   }
 
   int _indexOf(String id) =>
       _lists.indexWhere((GroceryList list) => list.id == id);
 
-  String _newListId() {
-    String id;
-    do {
-      id = 'list-${_nextId++}';
-    } while (_indexOf(id) != -1);
-    return id;
-  }
-
-  String _newCategoryId() {
-    int candidate = _customCategories.length + 1;
-    while (availableCategories.any(
-      (GroceryCategory item) => item.id == 'custom-$candidate',
-    )) {
-      candidate++;
-    }
-    return 'custom-$candidate';
-  }
-
-  String _cleanTitle(String title) {
-    final String trimmed = title.trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError.value(title, 'title', 'List name is required');
-    }
-    return trimmed;
-  }
-
-  double? _cleanBudget(double? budget) {
-    if (budget == null) return null;
-    if (!budget.isFinite || budget < 0) {
-      throw ArgumentError.value(
-        budget,
-        'budget',
-        'Budget must be a non-negative number',
-      );
-    }
-    return budget;
+  GroceryCategory _makeCustomCategory(String cleanName) {
+    final int nextSortOrder = _categories.fold<int>(
+      0,
+      (int max, GroceryCategory category) =>
+          category.sortOrder > max ? category.sortOrder : max,
+    );
+    return GroceryCategory(
+      id: IdGenerator.uuidV4(),
+      name: cleanName,
+      sortOrder: nextSortOrder + 1,
+    );
   }
 
   /// Resolves the form's category choice. A new category name wins over an
   /// existing selection, mirroring what the form shows to the user.
-  GroceryCategory? _resolveCategory(
+  GroceryCategory? _resolveLocalCategory(
     GroceryCategory? category,
     String? newCategoryName,
   ) {
@@ -197,11 +248,20 @@ class GroceryListController extends ChangeNotifier {
     final GroceryCategory? existing = findCategory(cleanName);
     if (existing != null) return existing;
 
-    final GroceryCategory created = GroceryCategory(
-      id: _newCategoryId(),
-      name: cleanName,
-    );
+    final GroceryCategory created = _makeCustomCategory(cleanName);
     _customCategories.add(created);
     return created;
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _listsSubscription?.cancel();
+    _categoriesSubscription?.cancel();
+    super.dispose();
   }
 }
