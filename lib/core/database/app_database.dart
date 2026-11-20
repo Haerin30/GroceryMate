@@ -5,12 +5,23 @@ import '../../features/grocery_lists/data/sample_grocery_lists.dart';
 import '../../features/grocery_lists/domain/grocery_category.dart';
 import '../../features/grocery_lists/domain/grocery_list.dart';
 import '../../features/grocery_lists/domain/grocery_list_input.dart';
+import '../../features/products/domain/product_category.dart';
 import 'grocery_status_converter.dart';
 import 'grocery_tables.dart';
+import 'product_tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Categories, GroceryLists, GroceryListItems])
+@DriftDatabase(
+  tables: [
+    Categories,
+    GroceryLists,
+    GroceryListItems,
+    ProductCategories,
+    Products,
+    ProductBarcodes,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   /// Production constructor. `driftDatabase` resolves the platform-specific
   /// application documents directory on native platforms, uses IndexedDB/OPFS
@@ -33,13 +44,31 @@ class AppDatabase extends _$AppDatabase {
   static final DateTime _seedCreatedAt = DateTime.utc(2026, 10, 1);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator migrator) async {
       await migrator.createAll();
       await _seedFirstRun();
+      await _seedProductCategories();
+    },
+    onUpgrade: (Migrator migrator, int from, int to) async {
+      // Schema 2 adds the product catalog without altering existing tables.
+      if (from < 2) {
+        await migrator.createTable(productCategories);
+        await migrator.createTable(products);
+        await migrator.createTable(productBarcodes);
+        await migrator.createIndex(productCategoriesNormalizedNameUnique);
+        await migrator.createIndex(productsCategoryId);
+        await migrator.createIndex(productsIsArchived);
+        await migrator.createIndex(productsName);
+        await migrator.createIndex(productsCreatedAt);
+        await migrator.createIndex(productsUpdatedAt);
+        await migrator.createIndex(productBarcodesProductIdUnique);
+        await migrator.createIndex(productBarcodesValueUnique);
+        await _seedProductCategories();
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       // SQLite does not enable foreign keys by default.
@@ -74,6 +103,30 @@ class AppDatabase extends _$AppDatabase {
               status: list.status,
               createdAt: list.updatedAt.toUtc(),
               updatedAt: list.updatedAt.toUtc(),
+            ),
+        ]);
+      });
+    });
+  }
+
+  /// Product categories are seeded only by [MigrationStrategy.onCreate] or the
+  /// 1 → 2 upgrade, never by a routine app launch.
+  Future<void> _seedProductCategories() async {
+    await transaction(() async {
+      final List<ProductCategoryRow> existing = await select(productCategories)
+          .get();
+      if (existing.isNotEmpty) return;
+
+      await batch((Batch batch) {
+        batch.insertAll(productCategories, <ProductCategoriesCompanion>[
+          for (final ProductCategory category in ProductCategory.predefined)
+            ProductCategoriesCompanion.insert(
+              id: category.id,
+              name: category.name,
+              isPredefined: const Value(true),
+              sortOrder: Value(category.sortOrder),
+              createdAt: _seedCreatedAt,
+              updatedAt: _seedCreatedAt,
             ),
         ]);
       });

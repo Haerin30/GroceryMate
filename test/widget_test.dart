@@ -39,6 +39,7 @@ void main() {
 
     for (final String label in <String>[
       'Grocery Lists',
+      'Product Catalog',
       'Product Prices',
       'Budget',
       'Statistics',
@@ -50,5 +51,22 @@ void main() {
         findsOneWidget,
       );
     }
+  });
+
+  testWidgets('opens the Product Catalog from the navigation drawer', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const GroceryScanApp());
+
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(NavigationDrawerDestination, 'Product Catalog'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Product Catalog'), findsOneWidget);
+    expect(find.byKey(const Key('product-search-field')), findsOneWidget);
+    expect(find.byTooltip('Add Product'), findsOneWidget);
   });
 }

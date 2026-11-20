@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/router/app_destination.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../app/widgets/app_navigation_drawer.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../data/grocery_list_repository.dart';
 import '../domain/grocery_category.dart';
@@ -278,8 +278,7 @@ class _GroceryListsScreenState extends State<GroceryListsScreen> {
     );
   }
 
-  void _handleDestinationSelected(int index) {
-    final AppDestination destination = AppDestination.values[index];
+  void _handleDestinationSelected(AppDestination destination) {
     Navigator.of(context).pop(); // Close the drawer first.
     if (destination == AppDestination.groceryLists) {
       return;
@@ -329,7 +328,10 @@ class _GroceryListsScreenState extends State<GroceryListsScreen> {
               ),
             ],
           ),
-          drawer: _AppDrawer(onDestinationSelected: _handleDestinationSelected),
+          drawer: AppNavigationDrawer(
+            selectedDestination: AppDestination.groceryLists,
+            onDestinationSelected: _handleDestinationSelected,
+          ),
           body: SafeArea(
             child: CustomScrollView(
               slivers: <Widget>[
@@ -460,62 +462,5 @@ class _GroceryListsScreenState extends State<GroceryListsScreen> {
       _controller.dispose();
     }
     super.dispose();
-  }
-}
-
-class _AppDrawer extends StatelessWidget {
-  const _AppDrawer({required this.onDestinationSelected});
-
-  final ValueChanged<int> onDestinationSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colors = theme.colorScheme;
-
-    return NavigationDrawer(
-      selectedIndex: 0,
-      onDestinationSelected: onDestinationSelected,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Row(
-            children: <Widget>[
-              CircleAvatar(
-                backgroundColor: colors.primary,
-                child: const Icon(Icons.shopping_cart, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      AppConstants.appName,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      AppConstants.appTagline,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(),
-        for (final AppDestination destination in AppDestination.values)
-          NavigationDrawerDestination(
-            icon: Icon(destination.icon),
-            selectedIcon: Icon(destination.icon),
-            label: Text(destination.label),
-          ),
-      ],
-    );
   }
 }
