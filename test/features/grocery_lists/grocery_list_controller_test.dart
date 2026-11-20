@@ -16,8 +16,8 @@ void main() {
   });
 
   group('create', () {
-    test('creates a list with trimmed name, category, and budget', () {
-      final GroceryList list = controller.addList(
+    test('creates a list with trimmed name, category, and budget', () async {
+      final GroceryList list = await controller.addList(
         title: '  Weekly shop  ',
         category: GroceryCategory.weekly,
         budget: 1250.50,
@@ -34,36 +34,36 @@ void main() {
       expect(controller.lists, <GroceryList>[list]);
     });
 
-    test('allows no category and no budget', () {
-      final GroceryList list = controller.addList(title: 'Errands');
+    test('allows no category and no budget', () async {
+      final GroceryList list = await controller.addList(title: 'Errands');
 
       expect(list.category, isNull);
       expect(list.budget, isNull);
     });
 
-    test('rejects an empty or whitespace-only name', () {
-      expect(() => controller.addList(title: '   '), throwsArgumentError);
+    test('rejects an empty or whitespace-only name', () async {
+      await expectLater(controller.addList(title: '   '), throwsArgumentError);
       expect(controller.lists, isEmpty);
     });
 
-    test('rejects negative, non-numeric, and non-finite budgets', () {
-      expect(
-        () => controller.addList(title: 'A', budget: -0.01),
+    test('rejects negative, non-numeric, and non-finite budgets', () async {
+      await expectLater(
+        controller.addList(title: 'A', budget: -0.01),
         throwsArgumentError,
       );
-      expect(
-        () => controller.addList(title: 'B', budget: double.nan),
+      await expectLater(
+        controller.addList(title: 'B', budget: double.nan),
         throwsArgumentError,
       );
-      expect(
-        () => controller.addList(title: 'C', budget: double.infinity),
+      await expectLater(
+        controller.addList(title: 'C', budget: double.infinity),
         throwsArgumentError,
       );
       expect(controller.lists, isEmpty);
     });
 
-    test('creates a custom category together with the list', () {
-      final GroceryList list = controller.addList(
+    test('creates a custom category together with the list', () async {
+      final GroceryList list = await controller.addList(
         title: 'Holiday supplies',
         newCategoryName: '  Holiday  ',
       );
@@ -89,10 +89,16 @@ void main() {
       );
     });
 
-    test('creates custom categories and prevents duplicates', () {
-      final GroceryCategory holiday = controller.addCustomCategory(' Holiday ');
-      final GroceryCategory same = controller.addCustomCategory('holiday');
-      final GroceryCategory weekly = controller.addCustomCategory(' WEEKLY ');
+    test('creates custom categories and prevents duplicates', () async {
+      final GroceryCategory holiday = await controller.addCustomCategory(
+        ' Holiday ',
+      );
+      final GroceryCategory same = await controller.addCustomCategory(
+        'holiday',
+      );
+      final GroceryCategory weekly = await controller.addCustomCategory(
+        ' WEEKLY ',
+      );
 
       expect(holiday.name, 'Holiday');
       expect(same.id, holiday.id);
@@ -103,9 +109,9 @@ void main() {
       expect(controller.findCategory('   '), isNull);
     });
 
-    test('reuses a duplicate custom name when saving a list', () {
-      controller.addCustomCategory('Garden');
-      final GroceryList list = controller.addList(
+    test('reuses a duplicate custom name when saving a list', () async {
+      await controller.addCustomCategory('Garden');
+      final GroceryList list = await controller.addList(
         title: 'Seeds',
         newCategoryName: 'garden',
       );
@@ -116,37 +122,40 @@ void main() {
   });
 
   group('update', () {
-    test('edits name, category, and budget while keeping a stable id', () {
-      final GroceryList list = controller.addList(
-        title: 'Old name',
-        category: GroceryCategory.weekly,
-        budget: 100,
-      );
-      now = now.add(const Duration(days: 1));
+    test(
+      'edits name, category, and budget while keeping a stable id',
+      () async {
+        final GroceryList list = await controller.addList(
+          title: 'Old name',
+          category: GroceryCategory.weekly,
+          budget: 100,
+        );
+        now = now.add(const Duration(days: 1));
 
-      final GroceryList? updated = controller.updateList(
-        list.id,
-        title: ' New name ',
-        category: GroceryCategory.family,
-        budget: 250,
-      );
+        final GroceryList? updated = await controller.updateList(
+          list.id,
+          title: ' New name ',
+          category: GroceryCategory.family,
+          budget: 250,
+        );
 
-      expect(updated?.id, list.id);
-      expect(updated?.title, 'New name');
-      expect(updated?.category, GroceryCategory.family);
-      expect(updated?.budget, 250);
-      expect(updated?.updatedAt, now);
-      expect(controller.lists.single.title, 'New name');
-    });
+        expect(updated?.id, list.id);
+        expect(updated?.title, 'New name');
+        expect(updated?.category, GroceryCategory.family);
+        expect(updated?.budget, 250);
+        expect(updated?.updatedAt, now);
+        expect(controller.lists.single.title, 'New name');
+      },
+    );
 
-    test('can clear the category and budget', () {
-      final GroceryList list = controller.addList(
+    test('can clear the category and budget', () async {
+      final GroceryList list = await controller.addList(
         title: 'With extras',
         category: GroceryCategory.party,
         budget: 500,
       );
 
-      final GroceryList? updated = controller.updateList(
+      final GroceryList? updated = await controller.updateList(
         list.id,
         title: 'Without extras',
         category: null,
@@ -157,30 +166,30 @@ void main() {
       expect(updated?.budget, isNull);
     });
 
-    test('returns null for an unknown id', () {
+    test('returns null for an unknown id', () async {
       expect(
-        controller.updateList('missing', title: 'X', budget: null),
+        await controller.updateList('missing', title: 'X', budget: null),
         isNull,
       );
     });
   });
 
   group('delete', () {
-    test('removes a list and reports unknown ids', () {
-      final GroceryList list = controller.addList(title: 'To delete');
+    test('removes a list and reports unknown ids', () async {
+      final GroceryList list = await controller.addList(title: 'To delete');
 
-      expect(controller.deleteList(list.id), isTrue);
+      expect(await controller.deleteList(list.id), isTrue);
       expect(controller.lists, isEmpty);
-      expect(controller.deleteList(list.id), isFalse);
+      expect(await controller.deleteList(list.id), isFalse);
     });
   });
 
   group('status', () {
-    test('changes status and refreshes the last-modified timestamp', () {
-      final GroceryList list = controller.addList(title: 'Status test');
+    test('changes status and refreshes the last-modified timestamp', () async {
+      final GroceryList list = await controller.addList(title: 'Status test');
       now = now.add(const Duration(hours: 2));
 
-      final GroceryList? completed = controller.setStatus(
+      final GroceryList? completed = await controller.setStatus(
         list.id,
         GroceryListStatus.completed,
       );
@@ -191,22 +200,25 @@ void main() {
 
       final DateTime changedAt = now;
       now = now.add(const Duration(hours: 2));
-      final GroceryList? unchanged = controller.setStatus(
+      final GroceryList? unchanged = await controller.setStatus(
         list.id,
         GroceryListStatus.completed,
       );
       expect(unchanged?.updatedAt, changedAt);
     });
 
-    test('supports archived and active statuses', () {
-      final GroceryList list = controller.addList(title: 'Lifecycle');
+    test('supports archived and active statuses', () async {
+      final GroceryList list = await controller.addList(title: 'Lifecycle');
 
       expect(
-        controller.setStatus(list.id, GroceryListStatus.archived)?.status,
+        (await controller.setStatus(
+          list.id,
+          GroceryListStatus.archived,
+        ))?.status,
         GroceryListStatus.archived,
       );
       expect(
-        controller.setStatus(list.id, GroceryListStatus.active)?.status,
+        (await controller.setStatus(list.id, GroceryListStatus.active))?.status,
         GroceryListStatus.active,
       );
     });

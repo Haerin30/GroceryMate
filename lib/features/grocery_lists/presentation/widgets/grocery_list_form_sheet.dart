@@ -6,7 +6,7 @@ import '../../state/grocery_list_controller.dart';
 
 /// Data returned by the form. [newCategoryName] is set only when the user chose
 /// "Create new category", so the controller can add it atomically with the list.
-typedef GroceryListFormSubmit = void Function({
+typedef GroceryListFormSubmit = Future<void> Function({
   required String title,
   GroceryCategory? category,
   required double? budget,
@@ -82,7 +82,7 @@ class _GroceryListFormSheetState extends State<GroceryListFormSheet> {
     return clean.isEmpty ? null : double.tryParse(clean);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     GroceryCategory? category;
@@ -99,13 +99,15 @@ class _GroceryListFormSheetState extends State<GroceryListFormSheet> {
       }
     }
 
-    widget.onSubmit(
+    await widget.onSubmit(
       title: _nameController.text.trim(),
       category: category,
       budget: _parseBudget(_budgetController.text),
       newCategoryName: newCategoryName,
     );
-    Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override

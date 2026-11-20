@@ -13,13 +13,57 @@ extension GroceryListStatusX on GroceryListStatus {
     GroceryListStatus.completed => 'Completed',
     GroceryListStatus.archived => 'Archived',
   };
+
+  /// Stable value stored in the `status` TEXT column.
+  String get storageValue => switch (this) {
+    GroceryListStatus.active => 'active',
+    GroceryListStatus.completed => 'completed',
+    GroceryListStatus.archived => 'archived',
+  };
 }
 
-/// A lightweight domain object for the grocery lists screen.
+/// User-facing action revealed while swiping a list card.
 ///
-/// It will be mapped from a Drift table later, so the UI does not depend on
-/// database code. [itemCount] and [estimatedTotal] stay at zero until grocery
-/// items are implemented in a later milestone.
+/// `complete` and `markCompleted` share the same target status but keep
+/// different labels so the gesture remains understandable from every status.
+enum GroceryListSwipeAction { complete, archive, reactivate, markCompleted }
+
+extension GroceryListSwipeActionX on GroceryListSwipeAction {
+  GroceryListStatus get targetStatus => switch (this) {
+    GroceryListSwipeAction.complete => GroceryListStatus.completed,
+    GroceryListSwipeAction.archive => GroceryListStatus.archived,
+    GroceryListSwipeAction.reactivate => GroceryListStatus.active,
+    GroceryListSwipeAction.markCompleted => GroceryListStatus.completed,
+  };
+
+  String get label => switch (this) {
+    GroceryListSwipeAction.complete => 'Complete',
+    GroceryListSwipeAction.archive => 'Archive',
+    GroceryListSwipeAction.reactivate => 'Reactivate',
+    GroceryListSwipeAction.markCompleted => 'Mark completed',
+  };
+}
+
+/// Single source of truth for the swipe table used by grocery list cards.
+extension GroceryListStatusSwipeX on GroceryListStatus {
+  GroceryListSwipeAction swipeAction({required bool toEnd}) => switch ((
+    this,
+    toEnd,
+  )) {
+    (GroceryListStatus.active, true) => GroceryListSwipeAction.complete,
+    (GroceryListStatus.active, false) => GroceryListSwipeAction.archive,
+    (GroceryListStatus.completed, true) => GroceryListSwipeAction.reactivate,
+    (GroceryListStatus.completed, false) => GroceryListSwipeAction.archive,
+    (GroceryListStatus.archived, true) => GroceryListSwipeAction.reactivate,
+    (GroceryListStatus.archived, false) => GroceryListSwipeAction.markCompleted,
+  };
+}
+
+/// Domain object rendered by the grocery lists screen.
+///
+/// Database rows are mapped to this shape so widgets never depend on Drift.
+/// [itemCount] and [estimatedTotal] stay at zero until grocery items are
+/// implemented in a later milestone.
 class GroceryList {
   const GroceryList({
     required this.id,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../features/grocery_lists/data/grocery_list_repository.dart';
 import '../../features/grocery_lists/presentation/grocery_lists_screen.dart';
 import '../../shared/widgets/coming_soon_view.dart';
 
@@ -16,21 +17,23 @@ abstract final class AppRoutes {
   static const String shoppingHistory = '/shopping-history';
   static const String settings = '/settings';
 
-  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
+  static Route<dynamic> onGenerateRoute(
+    RouteSettings settings, {
+    GroceryListRepository? repository,
+  }) {
     final String name = settings.name ?? groceryLists;
 
     if (name == groceryLists) {
       return MaterialPageRoute<dynamic>(
         settings: settings,
-        builder: (_) => const GroceryListsScreen(),
+        builder: (_) => GroceryListsScreen(repository: repository),
       );
     }
 
     return MaterialPageRoute<dynamic>(
       settings: settings,
-      builder: (_) => ComingSoonView(
-        title: _featureTitles[name] ?? AppConstants.appName,
-      ),
+      builder: (_) =>
+          ComingSoonView(title: _featureTitles[name] ?? AppConstants.appName),
     );
   }
 

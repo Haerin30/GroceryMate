@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
+import '../features/grocery_lists/data/grocery_list_repository.dart';
 import 'router/app_routes.dart';
 import 'theme/app_theme.dart';
 
@@ -10,7 +11,10 @@ import 'theme/app_theme.dart';
 /// add a Riverpod `ProviderScope` around this widget later without touching the
 /// feature screens.
 class GroceryScanApp extends StatelessWidget {
-  const GroceryScanApp({super.key});
+  const GroceryScanApp({super.key, this.repository});
+
+  /// Supplied by `main()`; widget tests can omit it to use in-memory data.
+  final GroceryListRepository? repository;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +25,8 @@ class GroceryScanApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       initialRoute: AppRoutes.groceryLists,
-      onGenerateRoute: AppRoutes.onGenerateRoute,
+      onGenerateRoute: (RouteSettings settings) =>
+          AppRoutes.onGenerateRoute(settings, repository: repository),
     );
   }
 }
