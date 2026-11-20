@@ -36,7 +36,7 @@ openFileDatabase() async {
 
 void main() {
   group('schema and seeding', () {
-    test('creates the three expected tables', () async {
+    test('creates the expected grocery and catalog tables', () async {
       final AppDatabase database = await openMemoryDatabase();
 
       final List<String> tableNames =
@@ -55,6 +55,9 @@ void main() {
           'categories',
           'grocery_lists',
           'grocery_list_items',
+          'product_categories',
+          'products',
+          'product_barcodes',
         ]),
       );
     });

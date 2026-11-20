@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/grocery_lists/data/grocery_list_repository.dart';
 import '../../features/grocery_lists/presentation/grocery_lists_screen.dart';
+import '../../features/products/data/product_repository.dart';
+import '../../features/products/presentation/products_screen.dart';
 import '../../shared/widgets/coming_soon_view.dart';
 
 /// Central place for route names.
-///
-/// Grocery Lists is the initial screen; the other sections get a temporary
-/// screen until their features are implemented.
 abstract final class AppRoutes {
   static const String groceryLists = '/';
+  static const String productCatalog = '/product-catalog';
   static const String productPrices = '/product-prices';
   static const String budget = '/budget';
   static const String statistics = '/statistics';
@@ -20,6 +20,7 @@ abstract final class AppRoutes {
   static Route<dynamic> onGenerateRoute(
     RouteSettings settings, {
     GroceryListRepository? repository,
+    ProductRepository? productRepository,
   }) {
     final String name = settings.name ?? groceryLists;
 
@@ -27,6 +28,12 @@ abstract final class AppRoutes {
       return MaterialPageRoute<dynamic>(
         settings: settings,
         builder: (_) => GroceryListsScreen(repository: repository),
+      );
+    }
+    if (name == productCatalog) {
+      return MaterialPageRoute<dynamic>(
+        settings: settings,
+        builder: (_) => ProductsScreen(repository: productRepository),
       );
     }
 
